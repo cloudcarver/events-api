@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cloudcarver/anclax/pkg/utils"
@@ -30,7 +31,7 @@ type RisingWave struct {
 
 func parse(cfg *config.Rw) string {
 	if cfg.DSN != nil {
-		return *cfg.DSN
+		return normalizeDSN(*cfg.DSN)
 	}
 
 	dsn := &url.URL{
@@ -43,6 +44,53 @@ func parse(cfg *config.Rw) string {
 	q.Set("sslmode", cfg.SSLMode)
 	dsn.RawQuery = q.Encode()
 	return dsn.String()
+}
+
+func normalizeDSN(dsn string) string {
+	if _, err := url.Parse(dsn); err == nil {
+		return dsn
+	}
+
+	escaped, ok := escapeURLUserinfo(dsn)
+	if !ok {
+		return dsn
+	}
+	if _, err := url.Parse(escaped); err != nil {
+		return dsn
+	}
+	return escaped
+}
+
+func escapeURLUserinfo(dsn string) (string, bool) {
+	schemeEnd := strings.Index(dsn, "://")
+	if schemeEnd < 0 {
+		return "", false
+	}
+
+	scheme := strings.ToLower(dsn[:schemeEnd])
+	if scheme != "postgres" && scheme != "postgresql" {
+		return "", false
+	}
+
+	authorityStart := schemeEnd + len("://")
+	at := strings.LastIndex(dsn[authorityStart:], "@")
+	if at < 0 {
+		return "", false
+	}
+	at += authorityStart
+
+	userinfo := dsn[authorityStart:at]
+	if userinfo == "" {
+		return "", false
+	}
+
+	var escapedUserinfo string
+	if username, password, ok := strings.Cut(userinfo, ":"); ok {
+		escapedUserinfo = url.UserPassword(username, password).String()
+	} else {
+		escapedUserinfo = url.User(userinfo).String()
+	}
+	return dsn[:authorityStart] + escapedUserinfo + dsn[at:], true
 }
 
 func NewRisingWave(cfg *config.Config, globalCtx *gctx.GlobalContext, cm *closer.CloserManager, log *zap.Logger) (*RisingWave, error) {

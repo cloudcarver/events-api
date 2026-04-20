@@ -41,3 +41,26 @@ func TestParseEscapesPasswordUserinfo(t *testing.T) {
 	require.Equal(t, uint16(4566), pgxCfg.ConnConfig.Port)
 	require.Equal(t, "dev", pgxCfg.ConnConfig.Database)
 }
+
+func TestParseNormalizesInvalidDSNUserinfo(t *testing.T) {
+	rawDSN := "postgres://root:p@ss:/?#%[]word@localhost:4566/dev?sslmode=disable"
+	dsn := parse(&config.Rw{
+		DSN: &rawDSN,
+	})
+
+	pgxCfg, err := pgxpool.ParseConfig(dsn)
+	require.NoError(t, err)
+	require.Equal(t, "root", pgxCfg.ConnConfig.User)
+	require.Equal(t, "p@ss:/?#%[]word", pgxCfg.ConnConfig.Password)
+	require.Equal(t, "localhost", pgxCfg.ConnConfig.Host)
+	require.Equal(t, uint16(4566), pgxCfg.ConnConfig.Port)
+	require.Equal(t, "dev", pgxCfg.ConnConfig.Database)
+}
+
+func TestParseKeepsValidDSN(t *testing.T) {
+	rawDSN := "postgres://root:p%40ss@localhost:4566/dev?sslmode=disable"
+
+	require.Equal(t, rawDSN, parse(&config.Rw{
+		DSN: &rawDSN,
+	}))
+}
