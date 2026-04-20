@@ -3,6 +3,8 @@ package rw
 import (
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/risingwavelabs/events-api/pkg/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,4 +20,24 @@ func TestFilterInsertableColumns(t *testing.T) {
 	filtered := filterInsertableColumns(cols)
 	require.Len(t, filtered, 2)
 	require.Equal(t, []string{"id", "data"}, []string{filtered[0].Name, filtered[1].Name})
+}
+
+func TestParseEscapesPasswordUserinfo(t *testing.T) {
+	password := "p@ss:/?#%[]word"
+	dsn := parse(&config.Rw{
+		Host:     "localhost",
+		Port:     4566,
+		User:     "root",
+		Password: password,
+		Db:       "dev",
+		SSLMode:  "disable",
+	})
+
+	pgxCfg, err := pgxpool.ParseConfig(dsn)
+	require.NoError(t, err)
+	require.Equal(t, "root", pgxCfg.ConnConfig.User)
+	require.Equal(t, password, pgxCfg.ConnConfig.Password)
+	require.Equal(t, "localhost", pgxCfg.ConnConfig.Host)
+	require.Equal(t, uint16(4566), pgxCfg.ConnConfig.Port)
+	require.Equal(t, "dev", pgxCfg.ConnConfig.Database)
 }

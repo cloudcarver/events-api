@@ -32,7 +32,7 @@ push-binary: build-binary
 	@echo 'latest version: $(VERSION)' > upload/metadata.txt
 	@aws s3 cp --recursive upload/ s3://rwtools/events-api
 
-REPO := risingwavelabs/events-api
+REPO := cloudcarver/events-api
 
 build-docker:
 	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/events-api-amd64 cmd/main.go

@@ -3,6 +3,9 @@ package rw
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/cloudcarver/anclax/pkg/utils"
@@ -29,14 +32,17 @@ func parse(cfg *config.Rw) string {
 	if cfg.DSN != nil {
 		return *cfg.DSN
 	}
-	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
-		cfg.User,
-		cfg.Password,
-		cfg.Host,
-		cfg.Port,
-		cfg.Db,
-		cfg.SSLMode,
-	)
+
+	dsn := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(cfg.User, cfg.Password),
+		Host:   net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
+		Path:   cfg.Db,
+	}
+	q := dsn.Query()
+	q.Set("sslmode", cfg.SSLMode)
+	dsn.RawQuery = q.Encode()
+	return dsn.String()
 }
 
 func NewRisingWave(cfg *config.Config, globalCtx *gctx.GlobalContext, cm *closer.CloserManager, log *zap.Logger) (*RisingWave, error) {
